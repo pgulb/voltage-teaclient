@@ -5,6 +5,7 @@ go 1.22.0
 require (
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/charmbracelet/huh v0.3.0
+	github.com/joho/godotenv v1.5.1
 )
 
 require (
