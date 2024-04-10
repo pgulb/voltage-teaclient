@@ -21,12 +21,14 @@ type gameLines struct {
 	headings []string
 }
 
+var lines gameLines
+
 // game state enum
 const (
 	stateLoadingRc = iota
 	stateRcLoadError
 	stateFormLocale
-	stateGame
+	stateHeading
 )
 
 type rcFileCheckResult struct {
@@ -193,29 +195,26 @@ func updateRc(cfg map[string]string) tea.Cmd {
 	}
 }
 
-// setPolish generates Polish localisation.
+// setLocale generates localisation and sets it inside gameLines struct.
 //
-// No parameters. Returns a gameLines struct.
-func setPolish() gameLines {
-	return gameLines{
-		headings: []string{
-			"Nie wszystko złoto co się świeci.",
-			"Lepiej późno niż wcale.",
-			"Nie szata zdobi człowieka.",
-		},
-	}
-}
-
-// setEnglish generates English localisation.
-//
-// No parameters. Returns a gameLines struct.
-func setEnglish() gameLines {
-	return gameLines{
-		headings: []string{
-			"All that glitters is not gold.",
-			"Better late than never.",
-			"Clothes do not make the man.",
-		},
+// No parameters. No return values.
+func setLocale(locale string) {
+	if locale == "EN" {
+		lines = gameLines{
+			headings: []string{
+				"All that glitters is not gold.",
+				"Better late than never.",
+				"Clothes do not make the man.",
+			},
+		}
+	} else {
+		lines = gameLines{
+			headings: []string{
+				"Nie wszystko złoto co się świeci.",
+				"Lepiej późno niż wcale.",
+				"Nie szata zdobi człowieka.",
+			},
+		}
 	}
 }
 
@@ -227,16 +226,19 @@ func setEnglish() gameLines {
 func randomHeading(currentIndex int) int {
 	r := currentIndex
 	for r == currentIndex {
-		r = rand.Intn(3)
+		r = rand.Intn(len(lines.headings))
 	}
-	return r // 0-2
+	return r
 }
 
 // RerollHeading generates a new heading different from current.
 //
 // currentIndex int
 // tea.Cmd
-func RerollHeading(currentIndex int) tea.Cmd {
+func RerollHeading(currentIndex int, locale string) tea.Cmd {
+	if len(lines.headings) == 0 {
+		setLocale(locale)
+	}
 	return func() tea.Msg {
 		return newHeading(randomHeading(currentIndex))
 	}
@@ -247,11 +249,11 @@ type model struct {
 	error               error
 	api                 string
 	locale              string
-	gameLines           gameLines
 	heading             string
 	headingIndex        int
 	formLocaleProcessed bool
 	formLocale          *huh.Form
+	formMainMenu        *huh.Form
 }
 
 // newModel initializes and returns a new model.
@@ -325,6 +327,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// getting content of loaded .voltagerc
 		case rcFileContent:
 			log.Println("got rcFileContent")
+			log.Println(msg.content)
 
 			if msg.error != nil {
 				log.Println(msg.error.Error())
@@ -339,10 +342,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// if locale is set from .voltagerc, no need for filling locale form
 			// locale can be empty if .voltagerc was downloaded from github
 			if m.locale != "" {
-				//if m.locale != "" && m.formLocale.State == huh.StateNormal {
 				m.formLocale.State = huh.StateAborted
-				m.state = stateGame
-				return m, RerollHeading(m.headingIndex)
+				m.state = stateHeading
+				// return m, RerollHeading(m.headingIndex, m.locale)
+				return m, RerollHeading(m.headingIndex, m.locale)
 			}
 		}
 
@@ -359,18 +362,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.formLocale.GetString("lang") != "" {
 			// roll a heading if form was completed
-			m.state = stateGame
-			return m, tea.Sequence(cmd, RerollHeading(m.headingIndex))
+			m.state = stateHeading
+			m.locale = m.formLocale.GetString("lang")
+			return m, tea.Sequence(cmd, RerollHeading(m.headingIndex, m.locale))
 		}
 		return m, cmd
 
 	// if locale form is complete or aborted
-	case stateGame:
+	case stateHeading:
 		if !m.formLocaleProcessed {
 			m.formLocaleProcessed = true
 
 			// locale from form, write to .voltagerc
-			if m.locale == "" {
+			// if m.locale == "" {
+			if m.formLocale.GetString("lang") != "" {
 				log.Println("getting locale from filled form")
 				m.locale = m.formLocale.GetString("lang")
 				cfg := make(map[string]string)
@@ -380,29 +385,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			log.Println("rerolling heading")
-			if m.locale == "EN" {
-				m.gameLines = setEnglish()
-				return m, RerollHeading(m.headingIndex)
-			} else {
-				m.gameLines = setPolish()
-				return m, RerollHeading(m.headingIndex)
-			}
+			return m, RerollHeading(m.headingIndex, m.locale)
 		}
 
 		switch msg := msg.(type) {
 		// rerolling heading
 		case newHeading:
 			log.Println("got newHeading")
-			if len(m.gameLines.headings) == 0 {
+			if len(lines.headings) == 0 {
 				log.Println("setting gameLines from newHeading")
-				if m.locale == "EN" {
-					m.gameLines = setEnglish()
-				} else {
-					m.gameLines = setPolish()
-				}
 			}
 			m.headingIndex = int(msg)
-			m.heading = m.gameLines.headings[m.headingIndex]
+			m.heading = lines.headings[m.headingIndex]
 
 		// .voltagerc updated
 		case rcFileUpdated:
@@ -411,18 +405,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			log.Println("got rcFileUpdated")
-			if m.locale == "EN" {
-				m.gameLines = setEnglish()
-				return m, nil
-			} else {
-				m.gameLines = setPolish()
-				return m, nil
-			}
+			return m, nil
 
 		case tea.KeyMsg:
 			switch msg.String() {
 			case " ":
-				return m, RerollHeading(m.headingIndex)
+				return m, RerollHeading(m.headingIndex, m.locale)
 			}
 		}
 	}
@@ -442,7 +430,7 @@ func (m model) View() string {
 		return fmt.Sprint("error!\n ", m.error.Error())
 	case stateFormLocale:
 		return m.formLocale.View()
-	case stateGame:
+	case stateHeading:
 		return m.heading
 	default:
 		return "unknown state: " + fmt.Sprint(m.state)
