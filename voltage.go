@@ -430,6 +430,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View returns the string representation of the model based on its state.
+//
+// No parameters.
+// Returns a string.
 func (m model) View() string {
 	switch m.state {
 	case stateLoadingRc:
@@ -446,6 +450,10 @@ func (m model) View() string {
 	}
 }
 
+// main is the entry point of the program.
+//
+// No parameters.
+// No return values.
 func main() {
 	f, err := os.OpenFile("game.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
