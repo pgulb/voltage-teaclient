@@ -17,7 +17,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type texts struct {
+type gameLines struct {
 	headings []string
 }
 
@@ -195,9 +195,9 @@ func updateRc(cfg map[string]string) tea.Cmd {
 
 // setPolish generates Polish localisation.
 //
-// No parameters. Returns a texts struct.
-func setPolish() texts {
-	return texts{
+// No parameters. Returns a gameLines struct.
+func setPolish() gameLines {
+	return gameLines{
 		headings: []string{
 			"Nie wszystko złoto co się świeci.",
 			"Lepiej późno niż wcale.",
@@ -208,9 +208,9 @@ func setPolish() texts {
 
 // setEnglish generates English localisation.
 //
-// No parameters. Returns a texts struct.
-func setEnglish() texts {
-	return texts{
+// No parameters. Returns a gameLines struct.
+func setEnglish() gameLines {
+	return gameLines{
 		headings: []string{
 			"All that glitters is not gold.",
 			"Better late than never.",
@@ -247,7 +247,7 @@ type model struct {
 	error               error
 	api                 string
 	locale              string
-	texts               texts
+	gameLines           gameLines
 	heading             string
 	headingIndex        int
 	formLocaleProcessed bool
@@ -381,10 +381,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			log.Println("rerolling heading")
 			if m.locale == "EN" {
-				m.texts = setEnglish()
+				m.gameLines = setEnglish()
 				return m, RerollHeading(m.headingIndex)
 			} else {
-				m.texts = setPolish()
+				m.gameLines = setPolish()
 				return m, RerollHeading(m.headingIndex)
 			}
 		}
@@ -393,16 +393,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// rerolling heading
 		case newHeading:
 			log.Println("got newHeading")
-			if len(m.texts.headings) == 0 {
-				log.Println("setting texts from newHeading")
+			if len(m.gameLines.headings) == 0 {
+				log.Println("setting gameLines from newHeading")
 				if m.locale == "EN" {
-					m.texts = setEnglish()
+					m.gameLines = setEnglish()
 				} else {
-					m.texts = setPolish()
+					m.gameLines = setPolish()
 				}
 			}
 			m.headingIndex = int(msg)
-			m.heading = m.texts.headings[m.headingIndex]
+			m.heading = m.gameLines.headings[m.headingIndex]
 
 		// .voltagerc updated
 		case rcFileUpdated:
@@ -412,10 +412,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			log.Println("got rcFileUpdated")
 			if m.locale == "EN" {
-				m.texts = setEnglish()
+				m.gameLines = setEnglish()
 				return m, nil
 			} else {
-				m.texts = setPolish()
+				m.gameLines = setPolish()
 				return m, nil
 			}
 
@@ -443,8 +443,7 @@ func (m model) View() string {
 	case stateFormLocale:
 		return m.formLocale.View()
 	case stateGame:
-		s := fmt.Sprintf("%v\n%v - %v", m.locale, m.heading, m.headingIndex)
-		return s
+		return m.heading
 	default:
 		return "unknown state: " + fmt.Sprint(m.state)
 	}
