@@ -40,6 +40,9 @@ type rcFileContent struct {
 type rcFileUpdated bool
 type newHeading int
 
+// rcFileName returns the path to the voltage configuration file.
+//
+// It has no parameters and returns a string and an error.
 func rcFileName() (string, error) {
 	rcPath, err := os.UserHomeDir()
 	if err != nil {
@@ -49,6 +52,10 @@ func rcFileName() (string, error) {
 	return rcPath, nil
 }
 
+// rcDirName generates the directory name for configuration file.
+//
+// No parameters.
+// Returns a string representing the directory path and an error if any.
 func rcDirName() (string, error) {
 	rcPath, err := os.UserHomeDir()
 	if err != nil {
@@ -58,6 +65,10 @@ func rcDirName() (string, error) {
 	return rcPath, nil
 }
 
+// checkForRcFile checks for the existence of .voltagerc file.
+//
+// No parameters.
+// Returns a tea.Msg.
 func checkForRcFile() tea.Msg {
 	rcPath, err := rcFileName()
 	if err != nil {
@@ -73,6 +84,10 @@ func checkForRcFile() tea.Msg {
 	return rcFileCheckResult{exist: !info.IsDir(), error: nil}
 }
 
+// createRcFile creates .voltagerc file and returns its content or an error.
+// Basic file is pulled from main branch of gh repo.
+// No parameters.
+// Returns a tea.Msg.
 func createRcFile() tea.Msg {
 	rcDir, err := rcDirName()
 	if err != nil {
@@ -132,6 +147,10 @@ func createRcFile() tea.Msg {
 	}
 }
 
+// loadRc loads the .voltagerc file and returns its content or an error message.
+//
+// No parameters.
+// Returns a tea.Msg.
 func loadRc() tea.Msg {
 	rc, err := rcFileName()
 	if err != nil {
@@ -153,6 +172,9 @@ func loadRc() tea.Msg {
 	}
 }
 
+// updateRc updates the .voltagerc file with the provided configuration.
+//
+// The parameter is a map of string key-value pairs. The return type is a tea.Cmd.
 func updateRc(cfg map[string]string) tea.Cmd {
 	return func() tea.Msg {
 		content, err := godotenv.Marshal(cfg)
@@ -171,6 +193,9 @@ func updateRc(cfg map[string]string) tea.Cmd {
 	}
 }
 
+// setPolish generates Polish localisation.
+//
+// No parameters. Returns a texts struct.
 func setPolish() texts {
 	return texts{
 		headings: []string{
@@ -181,6 +206,9 @@ func setPolish() texts {
 	}
 }
 
+// setEnglish generates English localisation.
+//
+// No parameters. Returns a texts struct.
 func setEnglish() texts {
 	return texts{
 		headings: []string{
@@ -191,6 +219,11 @@ func setEnglish() texts {
 	}
 }
 
+// randomHeading generates a random heading different from the currentIndex.
+// Heading is visible after application finished setting locale.
+//
+// Takes an integer currentIndex as a parameter.
+// Returns an integer.
 func randomHeading(currentIndex int) int {
 	r := currentIndex
 	for r == currentIndex {
@@ -199,6 +232,10 @@ func randomHeading(currentIndex int) int {
 	return r // 0-2
 }
 
+// RerollHeading generates a new heading different from current.
+//
+// currentIndex int
+// tea.Cmd
 func RerollHeading(currentIndex int) tea.Cmd {
 	return func() tea.Msg {
 		return newHeading(randomHeading(currentIndex))
@@ -217,6 +254,11 @@ type model struct {
 	formLocale          *huh.Form
 }
 
+// newModel initializes and returns a new model.
+// Model represents state of application as a whole.
+//
+// No parameters.
+// Returns a model.
 func newModel() model {
 	return model{
 		state: stateLoadingRc,
@@ -230,6 +272,12 @@ func newModel() model {
 	}
 }
 
+// Init initializes the model.
+// Runs a 'batch' of commands (unordered).
+// Locale form is initialised and .voltagerc file check is scheduled.
+//
+// No parameters.
+// Returns a tea.Cmd.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.formLocale.Init(),
@@ -237,6 +285,13 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+// Update updates the model based on the given message and returns
+// the updated model and any command to execute.
+// Update method is called for every incoming message.
+// it reacts for user inputs like key presses and other messages
+// like command outputs, file i/o, http requests etc.
+//
+// msg tea.Msg parameter, tea.Model and tea.Cmd return types.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	// program exit combinations
@@ -247,10 +302,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// checking state of application
 	switch m.state {
+	// this state is used for loading .voltagerc file
 	case stateLoadingRc:
 		switch msg := msg.(type) {
-		// creating basic .rc file or loading if detected existing
+		// creating basic .voltagerc file or loading if detected existing
 		case rcFileCheckResult:
 			log.Println("got rcFileCheckResult")
 			if msg.error != nil {
@@ -265,7 +322,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, loadRc
 			}
 
-		// getting content of loaded .rc
+		// getting content of loaded .voltagerc
 		case rcFileContent:
 			log.Println("got rcFileContent")
 
@@ -279,8 +336,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.locale = msg.content["VOLTAGE_LOCALE"]
 			m.state = stateFormLocale
 
-			// if locale is set from .rc, no need for filling locale form
-			// locale can be empty if .rc was downloaded from github
+			// if locale is set from .voltagerc, no need for filling locale form
+			// locale can be empty if .voltagerc was downloaded from github
 			if m.locale != "" {
 				//if m.locale != "" && m.formLocale.State == huh.StateNormal {
 				m.formLocale.State = huh.StateAborted
@@ -289,10 +346,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	// this state displays error message and exits
 	case stateRcLoadError:
 		time.Sleep(time.Second * 10)
 		return m, tea.Quit
 
+	// this state displays locale form
 	case stateFormLocale:
 		form, cmd := m.formLocale.Update(msg)
 		if f, ok := form.(*huh.Form); ok {
@@ -310,7 +369,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.formLocaleProcessed {
 			m.formLocaleProcessed = true
 
-			// locale from form, write to .rc
+			// locale from form, write to .voltagerc
 			if m.locale == "" {
 				log.Println("getting locale from filled form")
 				m.locale = m.formLocale.GetString("lang")
@@ -331,6 +390,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg := msg.(type) {
+		// rerolling heading
 		case newHeading:
 			log.Println("got newHeading")
 			if len(m.texts.headings) == 0 {
@@ -344,7 +404,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.headingIndex = int(msg)
 			m.heading = m.texts.headings[m.headingIndex]
 
-		// .rc updated
+		// .voltagerc updated
 		case rcFileUpdated:
 			if !msg {
 				log.Println("error on rcFileUpdated")
