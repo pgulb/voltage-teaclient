@@ -42,18 +42,6 @@ type rcFileContent struct {
 type rcFileUpdated bool
 type newHeading int
 
-// rcFileName returns the path to the voltage configuration file.
-//
-// It has no parameters and returns a string and an error.
-func rcFileName() (string, error) {
-	rcPath, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	rcPath = filepath.Join(rcPath, "config", ".voltagerc")
-	return rcPath, nil
-}
-
 // rcDirName generates the directory name for configuration file.
 //
 // No parameters.
@@ -64,6 +52,18 @@ func rcDirName() (string, error) {
 		return "", err
 	}
 	rcPath = filepath.Join(rcPath, "config")
+	return rcPath, nil
+}
+
+// rcFileName returns the path to the voltage configuration file.
+//
+// It has no parameters and returns a string and an error.
+func rcFileName() (string, error) {
+	rcDir, err := rcDirName()
+	if err != nil {
+		return "", err
+	}
+	rcPath := filepath.Join(rcDir, ".voltagerc")
 	return rcPath, nil
 }
 
